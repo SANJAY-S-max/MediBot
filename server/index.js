@@ -18,6 +18,7 @@ const chatRoutes = require('./routes/chat');
 const voiceRoutes = require('./routes/voice');
 const visionRoutes = require('./routes/vision');
 const reportRoutes = require('./routes/report');
+const sessionRoutes = require('./routes/session');
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/voice', voiceRoutes);
 app.use('/api/vision', visionRoutes);
 app.use('/api/report', reportRoutes); // PDF Generation
+app.use('/api/session', sessionRoutes); // Save profile to NeonDB
 
 const PORT = process.env.PORT || 5000;
 

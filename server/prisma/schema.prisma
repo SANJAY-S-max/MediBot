@@ -4,13 +4,14 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model SessionLog {
   id        Int      @id @default(autoincrement())
+  name      String
   age       String
   gender    String
   location  String
   createdAt DateTime @default(now())
 }
+

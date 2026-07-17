@@ -1,39 +1,70 @@
 const express = require('express');
 const router = express.Router();
-const { appendMedicalDisclaimer } = require('../middleware/medicalSafety');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const medicalSafety = require('../middleware/medicalSafety');
+const { appendMedicalDisclaimer } = medicalSafety;
 
-router.post('/', async (req, res) => {
+// Initialize Google Gemini using GOOGLE_API_KEY from .env
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
+const SYSTEM_PROMPT = `You are MediBot, a compassionate and knowledgeable AI health assistant designed for health awareness in India. Your role is to:
+1. Listen carefully to the user's symptoms and health concerns.
+2. Ask ONE smart clarifying follow-up question at a time (about severity, duration, associated symptoms).
+3. After sufficient information is gathered (usually 2-3 exchanges), provide a clear awareness summary including:
+   - Possible conditions to be aware of (NOT a diagnosis)
+   - Practical prevention or home-care tips
+   - Clear guidance on when to urgently see a doctor
+4. Always be warm, simple, and easy to understand — especially for rural or non-medical users.
+5. Never provide a definitive medical diagnosis. Always remind users you are for awareness only.
+6. Keep responses concise and conversational. Avoid long paragraphs.`;
+
+router.post('/', medicalSafety, async (req, res) => {
   try {
     const { messages, profile } = req.body;
-    
-    const userMessageCount = messages.filter(m => m.role === 'user').length;
 
-    let aiResponse = "";
-
-    if (userMessageCount === 1) {
-      aiResponse = `I see you are from ${profile?.location || 'your area'}. To give you better information, could you tell me:
-- How high is the fever?
-- Do you have any rash, vomiting, or cough?
-- Any other symptoms like joint pain?`;
-    } else {
-      aiResponse = `**Possible common diseases it could relate to:**
-- Dengue, Malaria, or Viral Fever (common in ${profile?.location || 'your area'})
-
-**Prevention tips and what to watch for:**
-- Drink plenty of fluids (ORS, coconut water).
-- Watch for severe stomach pain or bleeding gums.
-- Protect yourself from mosquitoes.
-
-**Urgency level:**
-See a doctor within 24 hours if fever doesn't break.`;
-      
-      aiResponse = appendMedicalDisclaimer(aiResponse);
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: 'Messages array is required.' });
     }
 
-    res.json({ response: aiResponse });
+    // Build profile context string
+    let profileContext = '';
+    if (profile) {
+      profileContext = `User profile: Name: ${profile.name}, Age: ${profile.age}, Gender: ${profile.gender}, Location: ${profile.location}. Tailor your response to this user.\n\n`;
+    }
+
+    // Use Gemini 1.5 Flash (free tier)
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      systemInstruction: SYSTEM_PROMPT + '\n\n' + profileContext,
+    });
+
+    // Convert message history to Gemini format
+    // Gemini uses "user" and "model" roles (not "assistant")
+    const history = [];
+    const allMessages = [...messages];
+    
+    // Separate the last user message as the current input
+    const lastMessage = allMessages[allMessages.length - 1];
+    const historyMessages = allMessages.slice(0, -1);
+
+    for (const msg of historyMessages) {
+      if (msg.role === 'user' || msg.role === 'assistant') {
+        history.push({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }],
+        });
+      }
+    }
+
+    const chat = model.startChat({ history });
+    const result = await chat.sendMessage(lastMessage.content);
+    const rawReply = result.response.text();
+    const reply = appendMedicalDisclaimer(rawReply);
+
+    res.json({ reply });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to process chat message' });
+    console.error('Gemini API Error:', error.message);
+    res.status(500).json({ error: 'Failed to get response from AI. Please check your GOOGLE_API_KEY.' });
   }
 });
 

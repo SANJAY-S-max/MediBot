@@ -22,7 +22,14 @@ const ChatInterface = ({ profile }) => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = async (text, isMedical = true) => {
+  // Save profile to NeonDB when chat starts
+  useEffect(() => {
+    axios.post(`${API_URL}/session`, { profile }).catch(err => {
+      console.warn('Could not save session to DB:', err.message);
+    });
+  }, []);
+
+  const handleSendMessage = async (text) => {
     if (!text.trim()) return;
 
     const userMessage = { role: 'user', content: text, type: 'text' };
@@ -36,9 +43,11 @@ const ChatInterface = ({ profile }) => {
         messages: updatedMessages
       });
 
-      setMessages([...updatedMessages, { role: 'assistant', content: response.data.response, type: 'text' }]);
+      // Backend returns { reply: "..." }
+      const replyText = response.data.reply || 'I am sorry, I could not generate a response.';
+      setMessages([...updatedMessages, { role: 'assistant', content: replyText, type: 'text' }]);
       
-      // If the user has sent at least 2 messages, show the report generation button
+      // Show PDF button after 2 user messages
       const userCount = updatedMessages.filter(m => m.role === 'user').length;
       if (userCount >= 2) {
         setShowReportBtn(true);
@@ -46,7 +55,8 @@ const ChatInterface = ({ profile }) => {
 
     } catch (error) {
       console.error('Error sending message:', error);
-      setMessages([...updatedMessages, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', type: 'text' }]);
+      const errMsg = error.response?.data?.error || 'Sorry, I encountered an error. Please try again.';
+      setMessages([...updatedMessages, { role: 'assistant', content: errMsg, type: 'text' }]);
     } finally {
       setIsLoading(false);
     }

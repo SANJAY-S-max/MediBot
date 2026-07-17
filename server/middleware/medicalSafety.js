@@ -7,4 +7,10 @@ function appendMedicalDisclaimer(text) {
   return text;
 }
 
-module.exports = { appendMedicalDisclaimer };
+// Express middleware - just calls next(), disclaimer is appended in route handler
+function medicalSafetyMiddleware(req, res, next) {
+  next();
+}
+
+module.exports = medicalSafetyMiddleware;
+module.exports.appendMedicalDisclaimer = appendMedicalDisclaimer;
