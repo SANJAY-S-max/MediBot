@@ -1,1 +1,0 @@
-# MediBot App package

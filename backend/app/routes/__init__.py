@@ -1,1 +1,0 @@
-# MediBot API Routes package
