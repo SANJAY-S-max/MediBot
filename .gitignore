@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.pyc
+
+# Environment variables (NEVER commit secrets)
+.env
+.env.local
+.env.production
+*.env
+
+# Database files (use cloud DB in production)
+*.db
+*.sqlite
+*.sqlite3
+medibot.db
+
+# Logs
+*.log
+logs/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# Frontend build output
+frontend/dist/
+frontend/.vite/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.dockerignore
+
+# Vector store / AI index files (rebuilt at startup)
+backend/app/ai/faiss_index/
+backend/app/ai/*.index
+
+# Misc
+*.zip
+*.tar.gz
