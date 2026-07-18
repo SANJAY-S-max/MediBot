@@ -41,11 +41,9 @@ class ErrorBoundary extends React.Component {
           >
             🔄 Reload App
           </button>
-          {process.env.NODE_ENV === 'development' && (
-            <pre style={{ marginTop: '1rem', fontSize: '0.7rem', opacity: 0.6 }}>
-              {this.state.error?.toString()}
-            </pre>
-          )}
+          <p style={{ fontSize: '0.8rem', opacity: 0.7, marginBottom: '1.5rem', maxWidth: '500px', background: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: '0.5rem', wordBreak: 'break-word' }}>
+            Error: {this.state.error?.toString()}
+          </p>
         </div>
       );
     }

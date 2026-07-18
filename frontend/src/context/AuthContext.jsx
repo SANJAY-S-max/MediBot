@@ -5,10 +5,12 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('medibot_token') || '');
-  const [loading, setLoading] = useState(true);
+  const storedToken = (() => { try { return localStorage.getItem('medibot_token') || ''; } catch { return ''; } })();
+  const [token, setToken] = useState(storedToken);
+  // Start with false if no token — no API call needed
+  const [loading, setLoading] = useState(!!storedToken);
 
-  // Set API base URL based on environment or vite.config
+  // Set API base URL based on environment
   const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
