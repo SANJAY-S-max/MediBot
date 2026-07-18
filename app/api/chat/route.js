@@ -22,8 +22,9 @@ export async function POST(request) {
     return NextResponse.json({ response });
   } catch (err) {
     console.error("Chat error:", err);
+    // TEMPORARY: Return the exact error message so we can debug it
     return NextResponse.json({
-      response: "I apologize, I'm having trouble connecting right now. Please try again in a moment. If you have an emergency, please call emergency services immediately."
+      response: `DEBUG ERROR: ${err.message || "Unknown error"}. (The key you provided was likely invalid, please ensure it starts with 'AIzaSy'.)`
     }, { status: 500 });
   }
 }
