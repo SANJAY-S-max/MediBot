@@ -8,55 +8,53 @@ const API_URL = 'http://localhost:5000/api';
 
 const ChatInterface = ({ profile }) => {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: `Hello ${profile.name}! I am MediBot. I see you are from ${profile.location}. Please describe your symptoms or health concerns.`, type: 'text' }
+    {
+      role: 'assistant',
+      content: `Hello ${profile.name}! 👋 I am MediBot, your AI health assistant. I see you are from ${profile.location}.\n\nPlease describe your symptoms or any health concerns. You can also tap the 🎙️ microphone button to speak instead of typing.`,
+    }
   ]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showReportBtn, setShowReportBtn] = useState(false);
+  const [showPdfBtn, setShowPdfBtn] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(false);
   const chatEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = () => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  useEffect(() => scrollToBottom(), [messages, isLoading]);
 
+  /* Save profile session on mount */
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    axios.post(`${API_URL}/session`, { profile })
+      .then(() => console.log('Session saved to DB'))
+      .catch(err => console.warn('Could not save session:', err.message));
+  }, []);
 
-  // Save profile to NeonDB when chat starts
+  /* Check if TTS is available */
   useEffect(() => {
-    axios.post(`${API_URL}/session`, { profile }).catch(err => {
-      console.warn('Could not save session to DB:', err.message);
-    });
+    if (window.speechSynthesis) {
+      // Pre-load voices
+      window.speechSynthesis.getVoices();
+    }
   }, []);
 
   const handleSendMessage = async (text) => {
     if (!text.trim()) return;
 
-    const userMessage = { role: 'user', content: text, type: 'text' };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    const userMsg = { role: 'user', content: text };
+    const updated = [...messages, userMsg];
+    setMessages(updated);
     setIsLoading(true);
 
     try {
-      const response = await axios.post(`${API_URL}/chat`, {
-        profile,
-        messages: updatedMessages
-      });
+      const res = await axios.post(`${API_URL}/chat`, { profile, messages: updated });
+      const reply = res.data.reply || 'I am sorry, I could not generate a response.';
+      setMessages([...updated, { role: 'assistant', content: reply }]);
 
-      // Backend returns { reply: "..." }
-      const replyText = response.data.reply || 'I am sorry, I could not generate a response.';
-      setMessages([...updatedMessages, { role: 'assistant', content: replyText, type: 'text' }]);
-      
-      // Show PDF button after 2 user messages
-      const userCount = updatedMessages.filter(m => m.role === 'user').length;
-      if (userCount >= 2) {
-        setShowReportBtn(true);
-      }
+      const userCount = updated.filter(m => m.role === 'user').length;
+      if (userCount >= 2) setShowPdfBtn(true);
 
-    } catch (error) {
-      console.error('Error sending message:', error);
-      const errMsg = error.response?.data?.error || 'Sorry, I encountered an error. Please try again.';
-      setMessages([...updatedMessages, { role: 'assistant', content: errMsg, type: 'text' }]);
+    } catch (err) {
+      const errMsg = err.response?.data?.error || 'Sorry, I encountered an error. Please try again.';
+      setMessages([...updated, { role: 'assistant', content: errMsg }]);
     } finally {
       setIsLoading(false);
     }
@@ -64,55 +62,62 @@ const ChatInterface = ({ profile }) => {
 
   const handleGenerateReport = async () => {
     try {
-      const response = await axios.post(`${API_URL}/report`, {
-        profile,
-        messages
-      }, {
-        responseType: 'blob'
-      });
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'MediBot_Report.pdf');
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode.removeChild(link);
-
-    } catch (error) {
-      console.error("Failed to generate report:", error);
-      alert("Failed to generate PDF. Please ensure backend is running.");
+      const res = await axios.post(`${API_URL}/report`, { profile, messages }, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.setAttribute('download', `MediBot_Report_${profile.name}.pdf`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      alert('Failed to generate PDF. Please ensure the backend is running.');
     }
   };
 
-  const handleImageUpload = (file) => {
-    alert("Image upload is currently disabled in MediBot.");
-  };
-
   return (
-    <>
+    <div className="chat-wrapper">
+      {/* ── Floating PDF Button ── */}
+      {showPdfBtn && (
+        <div className="pdf-fab">
+          <button onClick={handleGenerateReport} title="Download PDF Report">
+            <Download size={20} />
+          </button>
+          <span className="pdf-fab-label">PDF</span>
+        </div>
+      )}
+
+      {/* ── Messages ── */}
       <div className="chat-area">
-        {messages.map((msg, index) => (
-          <MessageBubble key={index} message={msg} />
+        {messages.map((msg, i) => (
+          <MessageBubble
+            key={i}
+            message={msg}
+            autoSpeak={autoSpeak && msg.role === 'assistant' && i === messages.length - 1}
+          />
         ))}
+
+        {/* Typing indicator */}
         {isLoading && (
-          <div className="message-bubble assistant">
-            <span style={{ color: 'var(--text-muted)' }}>Thinking...</span>
+          <div className="message-row">
+            <div className="avatar bot">MB</div>
+            <div className="message-bubble assistant">
+              <div className="bot-label">MediBot</div>
+              <div className="typing-indicator">
+                <div className="typing-dot" />
+                <div className="typing-dot" />
+                <div className="typing-dot" />
+              </div>
+            </div>
           </div>
         )}
-        
-        {showReportBtn && !isLoading && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16, marginBottom: 16 }}>
-            <button onClick={handleGenerateReport} className="btn btn-primary" style={{ width: 'auto', padding: '0 24px', borderRadius: 8, display: 'flex', gap: 8 }}>
-              <Download size={18} />
-              Generate PDF Report
-            </button>
-          </div>
-        )}
+
         <div ref={chatEndRef} />
       </div>
-      <InputArea onSendMessage={handleSendMessage} onImageUpload={handleImageUpload} isLoading={isLoading} />
-    </>
+
+      {/* ── Input ── */}
+      <InputArea onSendMessage={handleSendMessage} isLoading={isLoading} />
+    </div>
   );
 };
 

@@ -32,9 +32,9 @@ router.post('/', medicalSafety, async (req, res) => {
       profileContext = `User profile: Name: ${profile.name}, Age: ${profile.age}, Gender: ${profile.gender}, Location: ${profile.location}. Tailor your response to this user.\n\n`;
     }
 
-    // Use Gemini 1.5 Flash (free tier)
+    // Use Gemini 3.5 Flash
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3.5-flash',
       systemInstruction: SYSTEM_PROMPT + '\n\n' + profileContext,
     });
 
@@ -45,7 +45,13 @@ router.post('/', medicalSafety, async (req, res) => {
     
     // Separate the last user message as the current input
     const lastMessage = allMessages[allMessages.length - 1];
-    const historyMessages = allMessages.slice(0, -1);
+    let historyMessages = allMessages.slice(0, -1);
+
+    // Gemini requires the history to start with a 'user' message. 
+    // The first message is often the bot's greeting, so we skip it.
+    while (historyMessages.length > 0 && historyMessages[0].role === 'assistant') {
+      historyMessages.shift();
+    }
 
     for (const msg of historyMessages) {
       if (msg.role === 'user' || msg.role === 'assistant') {
