@@ -14,7 +14,7 @@ export async function POST(request) {
 
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json({
-        response: "⚠️ AI service is not configured. Please add GEMINI_API_KEY to your environment variables. Get a free key at https://aistudio.google.com/app/apikey"
+        response: "⚠️ AI service is not configured. Please add GEMINI_API_KEY to your environment variables."
       });
     }
 
@@ -23,7 +23,7 @@ export async function POST(request) {
   } catch (err) {
     console.error("Chat error:", err);
     return NextResponse.json({
-      response: "I apologize, I'm having trouble connecting right now. Please try again in a moment. If you have an emergency, please call emergency services immediately."
+      response: `DEBUG: ${err.message}`
     }, { status: 500 });
   }
 }
