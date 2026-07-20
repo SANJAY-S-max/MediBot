@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { chatWithBot } from "@/lib/gemini";
+import { chatWithBot } from "@/lib/groq";
 import { verifyToken } from "@/lib/auth";
 
 export async function POST(request) {
@@ -12,9 +12,9 @@ export async function POST(request) {
     const { message, history = [], language = "en" } = await request.json();
     if (!message?.trim()) return NextResponse.json({ error: "Message required" }, { status: 400 });
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.GROQ_API_KEY) {
       return NextResponse.json({
-        response: "⚠️ AI service is not configured. Please add GEMINI_API_KEY to your environment variables."
+        response: "⚠️ AI service is not configured. Please add GROQ_API_KEY to your Vercel environment variables."
       });
     }
 
