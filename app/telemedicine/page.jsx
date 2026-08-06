@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
+import { JitsiMeeting } from "@jitsi/react-sdk";
 
 export default function TelemedicinePage() {
   const [meetingId, setMeetingId] = useState("");
@@ -12,7 +13,7 @@ export default function TelemedicinePage() {
   };
 
   const generateMeeting = () => {
-    const id = `medibot-${Math.random().toString(36).substring(2, 8)}`;
+    const id = `medibot-room-${Math.random().toString(36).substring(2, 10)}`;
     setMeetingId(id);
     setIsJoined(true);
   };
@@ -22,7 +23,7 @@ export default function TelemedicinePage() {
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-black">📹 Telemedicine</h1>
-          <p className="text-slate-400 text-sm">Secure video consultations with your healthcare provider</p>
+          <p className="text-slate-400 text-sm">Secure real-time video consultations</p>
         </div>
 
         {!isJoined ? (
@@ -33,26 +34,29 @@ export default function TelemedicinePage() {
               
               <div className="space-y-4">
                 <input 
-                  className="input-field" 
-                  placeholder="Meeting ID (e.g. medibot-xyz)" 
+                  className="input-field w-full p-3 rounded-lg bg-slate-900 border border-slate-700 text-white" 
+                  placeholder="Meeting ID (e.g. medibot-room-xyz)" 
                   value={meetingId}
                   onChange={(e) => setMeetingId(e.target.value)}
                 />
                 <button 
                   onClick={startMeeting}
                   disabled={!meetingId.trim()} 
-                  className="btn-primary w-full"
+                  className="btn-primary w-full bg-sky-500 hover:bg-sky-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
                 >
                   Join Meeting
                 </button>
               </div>
             </div>
 
-            <div className="glass-dark rounded-2xl p-6">
+            <div className="glass-dark rounded-2xl p-6 border border-slate-700">
               <h2 className="font-bold text-lg mb-2">Start a New Call</h2>
               <p className="text-slate-400 text-sm mb-6">Create a new secure meeting room to share with your patient.</p>
               
-              <button onClick={generateMeeting} className="btn-secondary w-full border-sky-500/30 text-sky-400 hover:bg-sky-500/10">
+              <button 
+                onClick={generateMeeting} 
+                className="w-full border border-sky-500/30 text-sky-400 hover:bg-sky-500/10 py-3 rounded-lg font-semibold transition-colors"
+              >
                 + Create Meeting Link
               </button>
             </div>
@@ -64,15 +68,37 @@ export default function TelemedicinePage() {
                 <p className="text-sm font-semibold">Meeting Room: <span className="text-sky-400">{meetingId}</span></p>
                 <p className="text-xs text-slate-400">Share this ID with the other participant</p>
               </div>
-              <button onClick={() => setIsJoined(false)} className="btn-secondary text-xs px-3 py-1.5 border-red-500/30 text-red-400 hover:bg-red-500/10">
+              <button 
+                onClick={() => setIsJoined(false)} 
+                className="text-xs px-4 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+              >
                 End Call
               </button>
             </div>
-            <div className="w-full h-[600px] bg-black rounded-xl overflow-hidden">
-              <iframe
-                src={`https://meet.jit.si/${meetingId}`}
-                allow="camera; microphone; fullscreen; display-capture"
-                className="w-full h-full border-0"
+            
+            <div className="w-full h-[650px] bg-black rounded-xl overflow-hidden">
+              <JitsiMeeting
+                domain="meet.jit.si"
+                roomName={meetingId}
+                configOverwrite={{
+                  startWithAudioMuted: false,
+                  disableModeratorIndicator: true,
+                  startScreenSharing: false,
+                  enableEmailInStats: false,
+                }}
+                interfaceConfigOverwrite={{
+                  DISABLE_JOIN_LEAVE_NOTIFICATIONS: true
+                }}
+                userInfo={{
+                  displayName: "MediBot User"
+                }}
+                onApiReady={(externalApi) => {
+                  console.log("Jitsi API Ready", externalApi);
+                }}
+                getIFrameRef={(iframeRef) => {
+                  iframeRef.style.height = '100%';
+                  iframeRef.style.width = '100%';
+                }}
               />
             </div>
           </div>

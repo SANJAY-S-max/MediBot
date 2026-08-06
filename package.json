@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
+    "@jitsi/react-sdk": "^1.4.4",
     "groq-sdk": "^1.3.0",
     "jose": "^6.2.3",
     "next": "16.2.10",
