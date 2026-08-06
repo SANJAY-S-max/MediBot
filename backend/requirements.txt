@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+langchain
+langchain-community
+langchain-chroma
+chromadb
+sentence-transformers
+pypdf
+python-docx
+tiktoken
+rank_bm25
+langgraph
+langchain-groq
+python-dotenv

@@ -34,7 +34,11 @@ export default function ChatPage() {
         body: JSON.stringify({ message: text, history, language: lang }),
       });
       const data = await res.json();
-      setMessages((m) => [...m, { role: "model", content: data.response || "Sorry, I couldn't process that." }]);
+      setMessages((m) => [...m, { 
+        role: "model", 
+        content: data.response || "Sorry, I couldn't process that.",
+        sources: data.sources || []
+      }]);
       // Save to localStorage
       const saved = JSON.parse(localStorage.getItem("medibot_chats") || "[]");
       saved.push({ date: new Date().toISOString(), symptoms: text, response: data.response });
@@ -116,6 +120,31 @@ export default function ChatPage() {
                   </div>
                 )}
                 <div dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
+                
+                {/* Explainable AI: Sources */}
+                {msg.sources && msg.sources.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-slate-700/50">
+                    <p className="text-xs font-semibold text-sky-400 mb-2 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      Verified Medical Sources
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {msg.sources.map((src, idx) => (
+                        <div key={idx} className="bg-slate-800/50 rounded-lg p-2 text-[11px]">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-slate-300 font-medium truncate">{src.source}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] ${src.relevance_score > 3 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                              Confidence: {src.relevance_score.toFixed(1)}
+                            </span>
+                          </div>
+                          <p className="text-slate-500 line-clamp-2 italic">"{src.content}"</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
