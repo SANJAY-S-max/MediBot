@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 
 const SAMPLE_MESSAGES = [
-  { role: "model", content: "👋 Hello! I'm MediBot, your AI health assistant. Please describe your symptoms or ask me a health question. I support **English**, **Hindi (हिंदी)**, and **Tamil (தமிழ்)**.\n\n⚠️ I provide preliminary guidance only — always consult a doctor for proper diagnosis." },
+  { role: "model", content: "👋 Hello! I'm your customizable AI assistant. I will act based on the role you define below. I support **English**, **Hindi (हिंदी)**, and **Tamil (தமிழ்)**.\n\n⚠️ I will ONLY answer questions relevant to my assigned role." },
 ];
 
 export default function ChatPage() {
@@ -11,6 +11,7 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [lang, setLang] = useState("en");
+  const [roleDescription, setRoleDescription] = useState("Software Engineer");
   const [listening, setListening] = useState(false);
   const bottomRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -31,7 +32,7 @@ export default function ChatPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history, language: lang }),
+        body: JSON.stringify({ message: text, history, language: lang, roleDescription }),
       });
       const data = await res.json();
       setMessages((m) => [...m, { 
@@ -80,23 +81,35 @@ export default function ChatPage() {
       .replace(/\n/g, "<br/>");
   };
 
-  const quickSymptoms = ["Fever and headache", "Chest pain", "Sore throat", "Stomach ache", "I feel dizzy"];
+  const quickSymptoms = ["Tell me a joke", "Explain a concept", "Give me advice", "Write some code", "Analyze this"];
 
   return (
     <AppLayout>
       <div className="flex flex-col h-[calc(100vh-10rem)] max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-black">🤖 AI Symptom Checker</h1>
-            <p className="text-slate-400 text-sm">Powered by Google Gemini</p>
+        <div className="flex flex-col mb-4 gap-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-black">🤖 AI Role-based Assistant</h1>
+              <p className="text-slate-400 text-sm">Powered by Google Gemini / Groq</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setMessages(SAMPLE_MESSAGES)} className="glass px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white transition-all">Clear Chat</button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setMessages(SAMPLE_MESSAGES)} className="glass px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white transition-all">Clear Chat</button>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-300">Bot Role:</span>
+            <input 
+              type="text" 
+              className="input-field flex-1 max-w-md text-sm py-1"
+              value={roleDescription}
+              onChange={(e) => setRoleDescription(e.target.value)}
+              placeholder="e.g. Math Teacher, Software Engineer, Fitness Coach"
+            />
           </div>
         </div>
 
-        {/* Quick symptoms */}
+        {/* Quick actions */}
         <div className="flex gap-2 flex-wrap mb-4">
           {quickSymptoms.map((s) => (
             <button key={s} onClick={() => sendMessage(s)}
@@ -115,8 +128,8 @@ export default function ChatPage() {
                 : "glass rounded-2xl rounded-tl-sm px-4 py-3 text-slate-200 text-sm"}`}>
                 {msg.role === "model" && (
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-5 h-5 bg-gradient-to-br from-sky-400 to-blue-600 rounded-full flex items-center justify-center text-xs">M</div>
-                    <span className="text-xs text-sky-400 font-semibold">MediBot</span>
+                    <div className="w-5 h-5 bg-gradient-to-br from-sky-400 to-blue-600 rounded-full flex items-center justify-center text-xs">AI</div>
+                    <span className="text-xs text-sky-400 font-semibold">Assistant</span>
                   </div>
                 )}
                 <div dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
@@ -157,7 +170,7 @@ export default function ChatPage() {
                       <div key={i} className="w-2 h-2 bg-sky-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
                     ))}
                   </div>
-                  <span className="text-xs text-slate-400">MediBot is analyzing...</span>
+                  <span className="text-xs text-slate-400">Assistant is analyzing...</span>
                 </div>
               </div>
             </div>
@@ -174,7 +187,7 @@ export default function ChatPage() {
           </button>
           <input
             className="input-field flex-1"
-            placeholder={listening ? "🎙️ Listening..." : lang === "hi" ? "अपने लक्षण यहाँ लिखें..." : lang === "ta" ? "உங்கள் அறிகுறிகளை இங்கே தட்டச்சு செய்யவும்..." : "Describe your symptoms here..."}
+            placeholder={listening ? "🎙️ Listening..." : lang === "hi" ? "यहाँ टाइप करें..." : lang === "ta" ? "இங்கே தட்டச்சு செய்யவும்..." : "Type your message here..."}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}

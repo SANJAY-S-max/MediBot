@@ -2,15 +2,13 @@ import Groq from "groq-sdk";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || "" });
 
-export async function chatWithBot(message, history = [], language = "en") {
+export async function chatWithBot(message, history = [], language = "en", roleDescription = "helpful assistant") {
   const langMap = { en: "English", hi: "Hindi", ta: "Tamil" };
   const langName = langMap[language] || "English";
 
-  const systemPrompt = `You are MediBot, a compassionate AI healthcare assistant. 
-You help patients understand their symptoms, provide health education, and guide them to appropriate care.
+  const systemPrompt = `You are a ${roleDescription}. Your role is STRICTLY limited to this domain.
 Always respond in ${langName}.
-Always remind users that you provide preliminary guidance only, not medical diagnosis.
-Be warm, empathetic, professional, and clear.`;
+If a user asks a question that is irrelevant to your role as a ${roleDescription}, you MUST politely refuse to answer and state that the question is irrelevant to your expertise. Do NOT provide answers outside your designated role. Be professional and clear.`;
 
   // Format history for Groq (OpenAI format)
   const messages = [

@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Role-based AI Assistant
+
+A customizable AI chatbot built with Next.js and Groq (Llama 3). 
+
+This application allows users to dynamically assign a "role" to the AI (e.g., Math Teacher, Software Engineer, Fitness Coach). The AI will strictly adhere to that role and politely refuse to answer any questions that fall outside its assigned expertise.
+
+## Features
+- **Dynamic Roles**: Change the AI's behavior instantly by typing a new role.
+- **Strict Guardrails**: Rejects off-topic questions automatically.
+- **Multilingual Support**: Supports English, Hindi, and Tamil.
+- **Voice Input**: Speak your questions directly to the bot.
 
 ## Getting Started
 
-First, run the development server:
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Add your Groq API Key to `.env.local`:
+   ```env
+   GROQ_API_KEY=your_groq_api_key_here
+   ```
+4. Run the development server: `npm run dev`
+5. Open [http://localhost:3000](http://localhost:3000)
 
+## Deployment
+
+Deploy easily to Vercel using the Vercel CLI:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npx vercel --prod
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+*Don't forget to add your `GROQ_API_KEY` to your Vercel Environment Variables!*

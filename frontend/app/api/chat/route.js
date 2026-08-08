@@ -8,7 +8,7 @@ export async function POST(request) {
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { message, history = [], language = "en" } = await request.json();
+    const { message, history = [], language = "en", roleDescription = "helpful assistant" } = await request.json();
     if (!message?.trim()) return NextResponse.json({ error: "Message required" }, { status: 400 });
 
     // In production, you would use an environment variable for the backend URL
@@ -22,6 +22,7 @@ export async function POST(request) {
       body: JSON.stringify({
         query: message,
         thread_id: user.id || "default_user_1",
+        role_description: roleDescription,
       }),
     });
     
