@@ -19,7 +19,7 @@ This application allows users to dynamically assign a "role" to the AI (e.g., Ma
    GROQ_API_KEY=your_groq_api_key_here
    ```
 4. Run the development server: `npm run dev`
-5. Open [http://localhost:3000](http://localhost:3000)
+5. Open [ http://localhost:3001]( http://localhost:3001)
 
 ## Deployment
 
