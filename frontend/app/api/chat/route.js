@@ -8,10 +8,10 @@ export async function POST(request) {
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { message, history = [], language = "en", roleDescription = "helpful assistant" } = await request.json();
+    const body = await request.json();
+    const message = body.message || body.query;
     if (!message?.trim()) return NextResponse.json({ error: "Message required" }, { status: 400 });
 
-    // In production, you would use an environment variable for the backend URL
     const backendUrl = process.env.FASTAPI_BACKEND_URL || "http://localhost:8000";
     
     const fastapiResponse = await fetch(`${backendUrl}/api/chat`, {
@@ -21,8 +21,15 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         query: message,
+        message: message,
         thread_id: user.id || "default_user_1",
-        role_description: roleDescription,
+        patient_latitude: body.patient_latitude,
+        patient_longitude: body.patient_longitude,
+        patient_vitals: body.patient_vitals,
+        symptoms: body.symptoms,
+        has_personal_transport: body.has_personal_transport !== undefined ? body.has_personal_transport : true,
+        language: body.language || "en",
+        roleDescription: body.roleDescription || "helpful assistant",
       }),
     });
     
@@ -31,10 +38,7 @@ export async function POST(request) {
     }
     
     const data = await fastapiResponse.json();
-    return NextResponse.json({ 
-      response: data.response,
-      sources: data.sources || []
-    });
+    return NextResponse.json(data);
   } catch (err) {
     console.error("Chat error:", err);
     return NextResponse.json({

@@ -1,0 +1,117 @@
+================================================================================
+                           MEDIBOT AI - PROJECT REPORT
+================================================================================
+Team Name:             MediBot
+Batch:                 2024 - 2028
+Problem Statement ID:  SIH26133
+Problem Statement:     Accessibility and quality of public healthcare services, 
+                       particularly in rural and underserved areas.
+
+================================================================================
+1. ABSTRACT
+================================================================================
+MediBot is an AI-assisted digital healthcare platform designed to improve access 
+to quality public healthcare services in rural and underserved areas. It connects 
+patients with suitable healthcare facilities through AI-assisted patient 
+prioritization, healthcare service discovery, smart referral management, and 
+multilingual support, helping users access the right healthcare service at the 
+right time.
+
+================================================================================
+2. PROJECT DESCRIPTION & OBJECTIVES
+================================================================================
+MediBot provides a unified platform for patients, healthcare workers (ASHA/ANM), 
+and public healthcare facilities (Sub-Centres, PHCs, CHCs, District Hospitals).
+
+Key Objectives:
+- Patient Intake & Prioritization: Patients input symptoms and basic health 
+  parameters to receive immediate triage classification (Red: Emergency, 
+  Yellow: Urgent/PHC OPD, Green: Routine/Teleconsultation).
+- Public Healthcare Facility Discovery: Instant identification of nearby 
+  Primary Health Centres (PHCs), Community Health Centres (CHCs), and 
+  District Hospitals with distance estimation and available specialty services.
+- Smart Referral Management: Generates verified digital referral pathways 
+  with clinical summaries to streamline patient routing across tiers.
+- Emergency & Transport Integration: 108 Emergency and 102 Rural/Maternal 
+  Ambulance dispatch integration with automated GPS coordinate transmission.
+- Dynamic Transit First-Aid & Precautions: Situation-specific first-aid 
+  recommendations (snakebite, trauma, fever/seizures, respiratory distress) 
+  and mandatory transit checklists (Aadhaar, ABHA / Ayushman Card, MCP card).
+- Telemedicine & Multilingual AI: Embedded WebRTC video consultations 
+  (Jitsi Meet) and multilingual voice-enabled AI symptom checking 
+  (English, Hindi, Tamil) via Groq LLaMA 3 / Google Gemini.
+
+================================================================================
+3. SYSTEM ARCHITECTURE & WORKFLOW
+================================================================================
+Workflow Pipeline:
+  [Patient / Rural User Intake] (Age, Symptoms, Onset, Auto-GPS)
+       │
+       ▼
+  [AI Clinical Triage & Prioritization Node]
+       │
+       ├──► [Red / Emergency] ──► [108/102 Ambulance Dispatch + GPS Broadcast]
+       │                          [+ Dynamic Transit Precautions & Hospital Alert]
+       │
+       ├──► [Yellow / Urgent]  ──► [Nearest PHC/CHC Service Discovery]
+       │                          [+ Smart Digital Referral Generation]
+       │
+       └──► [Green / Routine]  ──► [Multilingual AI Assistant / Teleconsultation]
+
+  [Hybrid RAG Knowledge Engine]
+       ├── ChromaDB Vector Database (Dense Medical Semantic Retrieval)
+       ├── BM25 Keyword Search (Exact Clinical Nomenclature)
+       ├── Cross-Encoder Re-Ranking (ms-marco-MiniLM-L-6-v2)
+       └── Groq LLaMA 3 70B Grounded Generation with Citations
+
+================================================================================
+4. REPOSITORY STRUCTURE
+================================================================================
+Medibot-AI/
+├── agents/                  # LangGraph state machine & multi-agent workflow
+│   ├── graph.py             # LangGraph routing & state checkpoints
+│   ├── nodes.py             # Triage, Retrieval, and Grounded QA Nodes
+│   └── state.py             # AgentState schema
+├── backend/                 # FastAPI REST API Backend
+│   ├── main.py              # Server entry point & /api/chat endpoint
+│   └── requirements.txt     # Python backend dependencies
+├── frontend/                # Next.js 16 + React 19 Frontend
+│   ├── app/                 # App Router (dashboard, doctor, admin, chat, etc.)
+│   ├── components/          # Reusable UI & AppLayout components
+│   ├── package.json         # Dependencies (@jitsi/react-sdk, groq-sdk, etc.)
+│   └── public/              # Static assets
+├── retrieval/               # Hybrid search implementation (BM25 + ChromaDB)
+├── vector_db/               # ChromaDB store & persistence
+├── embeddings/              # HuggingFace sentence transformer models
+├── knowledge_base/          # Ingestion pipelines and clinical manuals
+├── docker-compose.yml       # Production container orchestration
+├── INSTALL.md               # Deployment and test account credentials
+└── report.txt               # Project report (SIH26133)
+
+================================================================================
+5. TECHNOLOGY STACK
+================================================================================
+- Frontend: Next.js 16 (App Router), React 19, Tailwind CSS v4, @jitsi/react-sdk, Jose
+- Backend API: FastAPI, Uvicorn, Pydantic, Python 3.10+
+- AI Models & Orchestration: LangGraph, LangChain, Groq API (LLaMA 3 70B), Gemini API
+- RAG & Vector Engine: ChromaDB, BM25 Retriever, Cross-Encoder (Sentence Transformers)
+- Database & State Checkpoints: SQLite (medibot.db), SQLiteSaver, PostgreSQL
+- Emergency & Telephony: 108/102 Ambulance Dispatch Mock/API, Twilio Voice IVR
+
+================================================================================
+6. HOW TO RUN THE PLATFORM
+================================================================================
+1. Backend:
+   cd backend
+   pip install -r requirements.txt
+   uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+2. Frontend:
+   cd frontend
+   npm install
+   npm run dev
+   Access at: http://localhost:3000
+
+================================================================================
+                          END OF PROJECT REPORT
+================================================================================

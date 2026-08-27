@@ -1,10 +1,26 @@
+import os
+import sys
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.append(BASE_DIR)
+
 from langchain_community.retrievers import BM25Retriever
-from sentence_transformers import CrossEncoder
 from vector_db.chroma_store import vector_db_manager
 
-# Re-ranker model
-# We use a small, fast cross-encoder fine-tuned on MS MARCO for passage ranking
-cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2', max_length=512)
+# Lazy-loaded Cross-Encoder model
+_cross_encoder = None
+
+def get_cross_encoder():
+    global _cross_encoder
+    if _cross_encoder is None:
+        try:
+            from sentence_transformers import CrossEncoder
+            _cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2', max_length=512)
+        except Exception as e:
+            print(f"[HybridSearch] CrossEncoder fallback mode: {e}")
+            _cross_encoder = False
+    return _cross_encoder
 
 class HybridRetriever:
     def __init__(self):
@@ -42,8 +58,15 @@ class HybridRetriever:
         print(f"Executing hybrid search for: '{query}'")
         
         # 1. Broad Retrieval
-        semantic_docs = self.semantic_retriever.invoke(query)
-        bm25_docs = self.bm25_retriever.invoke(query)
+        try:
+            semantic_docs = self.semantic_retriever.invoke(query)
+        except Exception:
+            semantic_docs = []
+            
+        try:
+            bm25_docs = self.bm25_retriever.invoke(query)
+        except Exception:
+            bm25_docs = []
         
         # Combine and deduplicate
         unique_docs = {}
@@ -55,18 +78,26 @@ class HybridRetriever:
         if not retrieved_docs:
             return []
             
-        # 2. Cross-Encoder Re-ranking
-        pairs = [[query, doc.page_content] for doc in retrieved_docs]
-        scores = cross_encoder.predict(pairs)
-        
-        scored_docs = list(zip(retrieved_docs, scores))
-        scored_docs.sort(key=lambda x: x[1], reverse=True)
-        
-        top_docs = [doc for doc, score in scored_docs[:top_k]]
-        
-        for doc, score in scored_docs[:top_k]:
-            doc.metadata['relevance_score'] = float(score)
-            
+        # 2. Cross-Encoder Re-ranking with fallback
+        encoder = get_cross_encoder()
+        if encoder:
+            try:
+                pairs = [[query, doc.page_content] for doc in retrieved_docs]
+                scores = encoder.predict(pairs)
+                scored_docs = list(zip(retrieved_docs, scores))
+                scored_docs.sort(key=lambda x: x[1], reverse=True)
+                top_docs = [doc for doc, score in scored_docs[:top_k]]
+                for doc, score in scored_docs[:top_k]:
+                    doc.metadata['relevance_score'] = float(score)
+                return top_docs
+            except Exception as e:
+                print(f"[HybridSearch] Re-ranking error: {e}")
+
+        # Fallback scoring
+        top_docs = retrieved_docs[:top_k]
+        for idx, doc in enumerate(top_docs):
+            if 'relevance_score' not in doc.metadata:
+                doc.metadata['relevance_score'] = max(1.0, float(5.0 - idx))
         return top_docs
 
 # Global instance
@@ -80,7 +111,7 @@ def get_hybrid_retriever():
 
 if __name__ == "__main__":
     retriever = get_hybrid_retriever()
-    results = retriever.retrieve_and_rerank("What happens when blood sugar goes up?")
+    results = retriever.retrieve_and_rerank("Which hospital has ICU and ventilator?")
     for i, res in enumerate(results):
         print(f"\n--- Result {i+1} (Score: {res.metadata.get('relevance_score', 0):.2f}) ---")
-        print(res.page_content)
+        print(res.page_content[:200] + "...")

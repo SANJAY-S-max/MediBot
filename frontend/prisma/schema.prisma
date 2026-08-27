@@ -1,0 +1,825 @@
+// Prisma Schema for MediBot AI Healthcare Platform
+// Neon PostgreSQL Database
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  PATIENT
+  DOCTOR
+  AHA_WORKER
+  ADMIN
+}
+
+enum FacilityTier {
+  SUB_CENTRE
+  PHC
+  CHC
+  SUB_DISTRICT_HOSPITAL
+  DISTRICT_HOSPITAL
+  MEDICAL_COLLEGE
+  PRIVATE_MULTISPECIALTY
+}
+
+enum TriagePriority {
+  P1_EMERGENCY  // Immediate life-threatening / critical care required (ICU/Ventilator/Trauma)
+  P2_URGENT     // Specialized/Moderate intervention (Maternity, Fracture, Inpatient)
+  P3_ROUTINE    // Primary care / Outpatient / Sub-Centre / PHC
+}
+
+enum AssistanceStatus {
+  PENDING
+  MATCHED
+  ESCALATED
+  AMBULANCE_DISPATCHED
+  COMPLETED
+  CANCELLED
+}
+
+enum CheckupStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  MISSED
+  CANCELLED
+}
+
+enum DiagnosisType {
+  PROVISIONAL
+  CONFIRMED
+  DIFFERENTIAL
+}
+
+enum SeverityLevel {
+  LOW
+  MODERATE
+  HIGH
+  CRITICAL
+}
+
+enum PrescriptionStatus {
+  ACTIVE
+  COMPLETED
+  DISCONTINUED
+}
+
+enum EquipmentStatus {
+  OPERATIONAL
+  UNDER_MAINTENANCE
+  OUT_OF_ORDER
+  RESERVED
+}
+
+// ---------------------------------------------------------------------------
+// User & Role Entities
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  phone         String?
+  avatar        String?
+  role          Role      @default(PATIENT)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // 1-to-1 Role Profiles
+  patientProfile   PatientProfile?
+  doctorProfile    DoctorProfile?
+  ahaProfile       AHAWorkerProfile?
+  adminProfile     AdminProfile?
+
+  // Relations
+  notifications    Notification[]
+  auditLogs        AuditLog[]        @relation("UserAuditLogs")
+
+  @@index([email])
+  @@index([role])
+}
+
+model PatientProfile {
+  id                  String               @id @default(cuid())
+  userId              String               @unique
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  abhaId              String?              @unique // Ayushman Bharat Health Account ID
+  dateOfBirth         DateTime?
+  gender              String?
+  bloodGroup          String?
+  address             String?
+  district            String?
+  state               String?              @default("Tamil Nadu")
+  latitude            Float?
+  longitude           Float?
+  emergencyContact    String?
+  emergencyName       String?
+  preferredLanguage   String               @default("en") // en, hi, ta
+
+  // Clinical records
+  medicalHistory      PatientMedicalHistory?
+  visits              PatientVisit[]
+  diagnoses           Diagnosis[]
+  prescriptions       Prescription[]
+  testReports         TestReport[]
+  assistanceRequests  PatientAssistanceRequest[]
+  carePlans           PatientCarePlan[]
+  checkupSchedules    CheckupSchedule[]
+  ahaCheckups         AHACheckup[]
+  
+  // AHA worker assignments
+  ahaAssignments      AHAWorkerAssignment[]
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([abhaId])
+  @@index([district])
+}
+
+model DoctorProfile {
+  id                  String               @id @default(cuid())
+  userId              String               @unique
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  registrationNumber  String?              @unique
+  specialization      String               @default("General Medicine")
+  qualification       String?
+  hospitalId          String?
+  hospital            Hospital?            @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  department          String?
+  isAvailable         Boolean              @default(true)
+  consultationFee     Float?               @default(0)
+
+  // Relations
+  visits              PatientVisit[]
+  diagnoses           Diagnosis[]
+  prescriptions       Prescription[]
+  testReportsReviewed TestReport[]
+  checkupsReviewed    AHACheckup[]
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([hospitalId])
+  @@index([specialization])
+}
+
+model AHAWorkerProfile {
+  id                  String               @id @default(cuid())
+  userId              String               @unique
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  workerCode          String?              @unique // ASHA/AHA Government ID
+  assignedSubCentre   String?
+  assignedVillage     String?
+  assignedDistrict    String?
+  contactNumber       String?
+
+  // Assigned Patients & Checkups
+  assignments         AHAWorkerAssignment[]
+  checkupsConducted   AHACheckup[]
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([assignedDistrict])
+}
+
+model AdminProfile {
+  id                  String               @id @default(cuid())
+  userId              String               @unique
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  designation         String               @default("System Administrator")
+  department          String?              @default("Healthcare IT")
+  accessLevel         String               @default("FULL")
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Healthcare Infrastructure (Hospitals, Hostels, Equipment, Facilities)
+// ---------------------------------------------------------------------------
+
+model Hospital {
+  id                  String               @id @default(cuid())
+  name                String               @unique
+  code                String?              @unique
+  tier                FacilityTier         @default(PHC)
+  district            String
+  state               String               @default("Tamil Nadu")
+  pincode             String?
+  address             String
+  latitude            Float
+  longitude           Float
+  contactPhone        String
+  emergencyHelpline   String?              @default("108")
+  email               String?
+  isEmergency24x7     Boolean              @default(false)
+  hasBloodBank        Boolean              @default(false)
+  hasAmbulanceStation Boolean              @default(true)
+  isGovernment        Boolean              @default(true)
+  isVerified          Boolean              @default(true)
+  operatingHours      String               @default("24x7")
+
+  // Relationships
+  departments         HospitalDepartment[]
+  facilities          HospitalFacility[]
+  equipment           MedicalEquipment[]
+  diagnosticInstruments DiagnosticInstrument[]
+  medicalServices     MedicalService[]
+  bedCapacity         BedCapacity?
+  hostels             HostelAccommodation[]
+  doctors             DoctorProfile[]
+  patientVisits       PatientVisit[]
+  recommendations     HospitalRecommendation[]
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([district])
+  @@index([tier])
+  @@index([latitude, longitude])
+}
+
+model HostelAccommodation {
+  id                  String               @id @default(cuid())
+  hospitalId          String
+  hospital            Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  name                String
+  type                String               @default("Attendant Rest House / Dharmashala") // Attendant Dormitory, Low-cost Lodge, Free Government Quota
+  totalRooms          Int                  @default(20)
+  availableRooms      Int                  @default(8)
+  bedCapacity         Int                  @default(40)
+  availableBeds       Int                  @default(15)
+  distanceFromHospitalMeters Int           @default(50)
+  contactPerson       String?
+  contactPhone        String?
+  dailyTariffInr      Float                @default(0) // 0 = Free for BPL/PMJAY card holders
+  facilitiesIncluded  String?              // Drinking water, Canteen, Hot water, Lockers, Wheelchair access
+  isActive            Boolean              @default(true)
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([hospitalId])
+}
+
+model HospitalDepartment {
+  id                  String               @id @default(cuid())
+  hospitalId          String
+  hospital            Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  name                String               // Cardiology, Emergency & Trauma, Neurology, Obstetrics & Gynecology, Pediatrics, General Medicine, Orthopedics, Nephrology, Oncology, General Surgery
+  code                String?
+  headDoctorName      String?
+  floorLocation       String?
+  isOpen24x7          Boolean              @default(false)
+  isOperational       Boolean              @default(true)
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([hospitalId])
+  @@index([name])
+}
+
+model HospitalFacility {
+  id                  String               @id @default(cuid())
+  hospitalId          String
+  hospital            Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  name                String               // ICU, NICU, PICU, Major OT, Minor OT, Blood Bank, Cath Lab, Dialysis Centre, 24x7 Emergency Room, Burn Care Unit, Isolation Ward
+  type                String?
+  capacity            Int                  @default(0)
+  availableUnits      Int                  @default(0)
+  isOperational       Boolean              @default(true)
+  notes               String?
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([hospitalId])
+  @@index([name])
+}
+
+model MedicalEquipment {
+  id                  String               @id @default(cuid())
+  hospitalId          String
+  hospital            Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  name                String               // Ventilator, Defibrillator, Multipara Monitor, Oxygen Concentrator, Dialysis Machine, BiPAP Machine, Infant Incubator, Central Oxygen Pipeline
+  category            String               @default("Life Support") // Life Support, Monitoring, Surgical, Respiratory
+  totalCount          Int                  @default(1)
+  availableCount      Int                  @default(1)
+  status              EquipmentStatus      @default(OPERATIONAL)
+  lastInspectionDate  DateTime?
+  location            String?              // ICU Block, Trauma Ward, Delivery Room
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([hospitalId])
+  @@index([name])
+  @@index([status])
+}
+
+model DiagnosticInstrument {
+  id                  String               @id @default(cuid())
+  hospitalId          String
+  hospital            Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  name                String               // CT Scanner, 1.5T MRI, Digital X-Ray, Ultrasound Sonography, ECG Machine 12-Channel, Echo Cardiograph, Automated Biochemistry Analyzer, Malaria RDT, Dengue NS1 Antigen
+  category            String               @default("Imaging") // Imaging, Pathology, Point of Care, Cardiac
+  totalCount          Int                  @default(1)
+  availableCount      Int                  @default(1)
+  status              EquipmentStatus      @default(OPERATIONAL)
+  operatingHours      String               @default("24x7")
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([hospitalId])
+  @@index([name])
+}
+
+model MedicalService {
+  id                  String               @id @default(cuid())
+  hospitalId          String
+  hospital            Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  name                String               // 108 Advanced Life Support Ambulance, 102 Maternal Transport, 24x7 Jan Aushadhi Pharmacy, Telemedicine Unit, Emergency Blood Transfusion, Physiotherapy
+  category            String               @default("Emergency")
+  is24x7              Boolean              @default(true)
+  isAvailable         Boolean              @default(true)
+  contactDetails      String?
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([hospitalId])
+  @@index([name])
+}
+
+model BedCapacity {
+  id                  String               @id @default(cuid())
+  hospitalId          String               @unique
+  hospital            Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  totalBeds           Int                  @default(0)
+  availableBeds       Int                  @default(0)
+  icuBeds             Int                  @default(0)
+  availableIcuBeds    Int                  @default(0)
+  oxygenBeds          Int                  @default(0)
+  availableOxygenBeds Int                  @default(0)
+  ventilatorBeds      Int                  @default(0)
+  availableVentBeds   Int                  @default(0)
+  maternityBeds       Int                  @default(0)
+  availableMatBeds    Int                  @default(0)
+  lastUpdated         DateTime             @default(now()) @updatedAt
+
+  @@index([hospitalId])
+}
+
+// ---------------------------------------------------------------------------
+// Patient Clinical & Medical Records
+// ---------------------------------------------------------------------------
+
+model PatientMedicalHistory {
+  id                  String               @id @default(cuid())
+  patientProfileId    String               @unique
+  patient             PatientProfile       @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  bloodGroup          String?
+  allergies           String[]             @default([]) // e.g. ["Penicillin", "Sulfa drugs"]
+  chronicConditions   String[]             @default([]) // e.g. ["Hypertension", "Type 2 Diabetes", "Asthma"]
+  pastSurgeries       String[]             @default([]) // e.g. ["Appendectomy (2020)", "C-Section (2018)"]
+  familyHistory       String?
+  immunizations       String[]             @default([]) // e.g. ["Tetanus", "COVID-19 Booster", "Hepatitis B"]
+  smokingStatus       String?              @default("Never")
+  alcoholConsumption  String?              @default("No")
+  dietaryPreference   String?              @default("Vegetarian")
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([patientProfileId])
+}
+
+model PatientVisit {
+  id                  String               @id @default(cuid())
+  patientProfileId    String
+  patient             PatientProfile       @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  hospitalId          String?
+  hospital            Hospital?            @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+
+  doctorId            String?
+  doctor              DoctorProfile?       @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+
+  visitDate           DateTime             @default(now())
+  chiefComplaint      String
+  triagePriority      TriagePriority       @default(P3_ROUTINE)
+
+  // Vitals recorded at visit
+  systolicBp          Int?
+  diastolicBp         Int?
+  heartRate           Int?
+  spo2                Float?
+  respiratoryRate     Int?
+  temperature         Float?
+
+  clinicalSummary     String?
+  dischargeSummary    String?
+  followUpDate        DateTime?
+  status              String               @default("COMPLETED") // PENDING, IN_PROGRESS, COMPLETED
+
+  // Relations
+  diagnoses           Diagnosis[]
+  prescriptions       Prescription[]
+  testReports         TestReport[]
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([patientProfileId])
+  @@index([hospitalId])
+  @@index([doctorId])
+  @@index([visitDate])
+}
+
+model Diagnosis {
+  id                  String               @id @default(cuid())
+  patientProfileId    String
+  patient             PatientProfile       @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  visitId             String?
+  visit               PatientVisit?        @relation(fields: [visitId], references: [id], onDelete: SetNull)
+
+  doctorId            String?
+  doctor              DoctorProfile?       @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+
+  conditionName       String               // e.g. "Acute Coronary Syndrome", "Uncontrolled Hypertension", "Bronchial Asthma"
+  icdCode             String?              // e.g. "I20.9", "I10", "J45.9"
+  diagnosisType       DiagnosisType        @default(CONFIRMED)
+  severity            SeverityLevel        @default(MODERATE)
+  diagnosisDate       DateTime             @default(now())
+  clinicalNotes       String?
+  isResolved          Boolean              @default(false)
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([patientProfileId])
+  @@index([conditionName])
+}
+
+model Prescription {
+  id                  String               @id @default(cuid())
+  patientProfileId    String
+  patient             PatientProfile       @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  visitId             String?
+  visit               PatientVisit?        @relation(fields: [visitId], references: [id], onDelete: SetNull)
+
+  doctorId            String?
+  doctor              DoctorProfile?       @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+
+  medicationName      String               // e.g. "Amlodipine 5mg", "Metformin 500mg", "Paracetamol 650mg"
+  dosage              String               // e.g. "1 tablet"
+  frequency           String               // e.g. "Once daily after food (1-0-0)"
+  duration            String               // e.g. "30 days"
+  instructions        String?              // "Take with water in the morning"
+  startDate           DateTime             @default(now())
+  endDate             DateTime?
+  status              PrescriptionStatus   @default(ACTIVE)
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([patientProfileId])
+  @@index([status])
+}
+
+model TestReport {
+  id                  String               @id @default(cuid())
+  patientProfileId    String
+  patient             PatientProfile       @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  visitId             String?
+  visit               PatientVisit?        @relation(fields: [visitId], references: [id], onDelete: SetNull)
+
+  reviewedByDoctorId  String?
+  reviewedByDoctor    DoctorProfile?       @relation(fields: [reviewedByDoctorId], references: [id], onDelete: SetNull)
+
+  testName            String               // e.g. "Complete Blood Count (CBC)", "12-Lead ECG", "Chest X-Ray PA", "HbA1c"
+  category            String               @default("Laboratory") // Laboratory, Imaging, Cardiac, Point-of-Care
+  testDate            DateTime             @default(now())
+  resultSummary       String               // e.g. "Hemoglobin 12.8 g/dL, TLC 7,400 /mcL, Platelets 2.4 Lakhs"
+  reportDataJson      Json?                // Detailed quantitative parameters
+  referenceRange      String?
+  isAbnormal          Boolean              @default(false)
+  fileUrl             String?
+  status              String               @default("FINAL") // PENDING, FINAL
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([patientProfileId])
+  @@index([testName])
+}
+
+// ---------------------------------------------------------------------------
+// Patient Trouble / Assistance & Recommendation Workflows
+// ---------------------------------------------------------------------------
+
+model PatientAssistanceRequest {
+  id                  String               @id @default(cuid())
+  patientProfileId    String
+  patient             PatientProfile       @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  // Intake details
+  symptoms            String[]             // Selected symptom keys/descriptions
+  symptomDescription  String?              // Free-text or voice transcription
+  severity            SeverityLevel        @default(MODERATE)
+  durationHours       Int?                 @default(2)
+
+  // Physiological Vitals recorded during intake
+  spo2                Float?
+  heartRate           Int?
+  systolicBp          Int?
+  respiratoryRate     Int?
+  temperature         Float?
+  consciousnessLevel  String?              @default("Alert") // Alert, Voice, Pain, Unresponsive (AVPU)
+
+  // Geospatial & Mobility context
+  patientLatitude     Float
+  patientLongitude    Float
+  patientAddress      String?
+  hasPersonalTransport Boolean             @default(false)
+  mobilityAssistanceNeeded Boolean         @default(false)
+
+  // Clinical Triage Decision
+  triagePriority      TriagePriority       @default(P3_ROUTINE)
+  triageReason        String?              // Clinical rule explanation
+  requiredCapabilities String[]            // e.g. ["ICU", "Ventilator", "Cath Lab", "Blood Bank", "CT Scanner"]
+  recommendedTier     FacilityTier         @default(PHC)
+  ambulanceNeeded     Boolean              @default(false)
+  ambulanceType       String?              // "108 ALS", "102 Maternal", "Private BLS"
+
+  // Referral Slip details
+  referralCode        String?              @unique // REF-YYYYMMDD-XXXX
+  qrVerificationSvg   String?              // SVG string representation of QR code
+
+  status              AssistanceStatus     @default(MATCHED)
+
+  // Hospital recommendations
+  recommendations     HospitalRecommendation[]
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([patientProfileId])
+  @@index([triagePriority])
+  @@index([referralCode])
+  @@index([createdAt])
+}
+
+model HospitalRecommendation {
+  id                  String               @id @default(cuid())
+  assistanceRequestId String
+  assistanceRequest   PatientAssistanceRequest @relation(fields: [assistanceRequestId], references: [id], onDelete: Cascade)
+
+  hospitalId          String
+  hospital            Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  matchScore          Float                // 0 - 100 percentage match
+  distanceKm          Float
+  estimatedTravelTimeMinutes Float
+  isNearestCapable    Boolean              @default(false)
+  bypassReason        String?              // Why closer facilities were bypassed (e.g. "Lacks 24x7 ICU & Ventilator")
+  matchedCapabilities String[]             // List of verified capabilities matched
+  navigationUrl       String?
+
+  createdAt           DateTime             @default(now())
+
+  @@index([assistanceRequestId])
+  @@index([hospitalId])
+}
+
+model PatientCarePlan {
+  id                  String               @id @default(cuid())
+  patientProfileId    String
+  patient             PatientProfile       @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  title               String               // e.g. "Hypertension & Diabetes Control Protocol"
+  description         String?
+  targetGoals         String[]             @default([]) // e.g. ["Maintain BP < 130/80", "Fasting Sugar < 110 mg/dL"]
+  dietaryGuidelines   String?
+  activityGuidelines  String?
+  medicationPlan      String?
+  checkupFrequencyDays Int                 @default(14)
+  isActive            Boolean              @default(true)
+  startDate           DateTime             @default(now())
+  endDate             DateTime?
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([patientProfileId])
+}
+
+// ---------------------------------------------------------------------------
+// AHA Worker Assignments & Configurable Checkup System
+// ---------------------------------------------------------------------------
+
+model AHAWorkerAssignment {
+  id                  String               @id @default(cuid())
+  ahaWorkerProfileId  String
+  ahaWorker           AHAWorkerProfile     @relation(fields: [ahaWorkerProfileId], references: [id], onDelete: Cascade)
+
+  patientProfileId    String
+  patient             PatientProfile       @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  priority            SeverityLevel        @default(MODERATE)
+  assignmentDate      DateTime             @default(now())
+  notes               String?
+  isActive            Boolean              @default(true)
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@unique([ahaWorkerProfileId, patientProfileId])
+  @@index([ahaWorkerProfileId])
+  @@index([patientProfileId])
+}
+
+model CheckupSchedule {
+  id                  String               @id @default(cuid())
+  patientProfileId    String
+  patient             PatientProfile       @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  title               String               @default("Routine AHA Home Health Visit")
+  dueDate             DateTime
+  frequencyDays       Int                  @default(14)
+  status              CheckupStatus        @default(PENDING)
+  notes               String?
+
+  // Completed checkup link
+  checkup             AHACheckup?
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([patientProfileId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+model ChecklistTemplate {
+  id                  String               @id @default(cuid())
+  title               String               // e.g. "Standard AHA Rural Home Visit Checklist"
+  category            String               @default("Home Checkup")
+  version             Int                  @default(1)
+  isActive            Boolean              @default(true)
+  
+  // JSON array of configurable checklist items:
+  // [
+  //   { "id": "step_1", "step": 1, "title": "Visit Verification", "description": "Confirm patient identity & location", "required": true },
+  //   { "id": "step_2", "step": 2, "title": "Vital Signs Measurement", "description": "Measure SpO2, BP, Pulse, Temp, Blood Glucose", "required": true },
+  //   { "id": "step_3", "step": 3, "title": "Medication Adherence", "description": "Verify compliance with prescribed regimen", "required": true },
+  //   { "id": "step_4", "step": 4, "title": "Follow-Up Requirements", "description": "Check lab schedules & doctor appointments", "required": true },
+  //   { "id": "step_5", "step": 5, "title": "Symptom Inquiry", "description": "Screen for fever, chest pain, breathlessness, dizziness", "required": true },
+  //   { "id": "step_6", "step": 6, "title": "Field Observations", "description": "Record hydration, mobility, nutrition, living environment", "required": false },
+  //   { "id": "step_7", "step": 7, "title": "Escalation & Doctor Referral", "description": "Flag concerning findings for immediate medical review", "required": true }
+  // ]
+  itemsJson           Json
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([isActive])
+}
+
+model AHACheckup {
+  id                  String               @id @default(cuid())
+  ahaWorkerProfileId  String
+  ahaWorker           AHAWorkerProfile     @relation(fields: [ahaWorkerProfileId], references: [id], onDelete: Cascade)
+
+  patientProfileId    String
+  patient             PatientProfile       @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  scheduleId          String?              @unique
+  schedule            CheckupSchedule?     @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+
+  reviewedByDoctorId  String?
+  reviewedByDoctor    DoctorProfile?       @relation(fields: [reviewedByDoctorId], references: [id], onDelete: SetNull)
+
+  visitDate           DateTime             @default(now())
+  
+  // Vitals recorded by AHA worker
+  spo2                Float?
+  heartRate           Int?
+  systolicBp          Int?
+  diastolicBp         Int?
+  bloodGlucoseMgDl    Float?
+  temperature         Float?
+
+  // Checklist execution answers (JSON mapping step id to response, status, values)
+  checklistResponses  Json
+
+  medicationAdherence Boolean              @default(true)
+  symptomsReported    String[]             @default([])
+  observations        String?
+  
+  // Escalation flag
+  isEscalatedToDoctor Boolean              @default(false)
+  escalationReason    String?
+  escalationPriority  SeverityLevel        @default(LOW)
+  doctorReviewNotes   String?
+  doctorReviewedAt    DateTime?
+
+  status              String               @default("COMPLETED") // COMPLETED, FOLLOW_UP_REQUIRED
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([ahaWorkerProfileId])
+  @@index([patientProfileId])
+  @@index([visitDate])
+  @@index([isEscalatedToDoctor])
+}
+
+// ---------------------------------------------------------------------------
+// System Governance, Notifications & Audit Logs
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id                  String               @id @default(cuid())
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title               String
+  message             String
+  type                String               @default("INFO") // INFO, WARNING, EMERGENCY, CHECKUP_REMINDER, ESCALATION
+  link                String?
+  isRead              Boolean              @default(false)
+
+  createdAt           DateTime             @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model AuditLog {
+  id                  String               @id @default(cuid())
+  actorUserId         String?
+  actorUser           User?                @relation("UserAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  action              String               // CREATE, UPDATE, DELETE, LOGIN, ESCALATION, REVIEW, CHECKLIST_SUBMIT
+  entity              String               // User, PatientProfile, Hospital, MedicalEquipment, AHACheckup, Diagnosis, Prescription
+  entityId            String?
+  details             Json?                // Before/after state or metadata
+  ipAddress           String?
+  userAgent           String?
+
+  timestamp           DateTime             @default(now())
+
+  @@index([actorUserId])
+  @@index([action])
+  @@index([entity])
+  @@index([timestamp])
+}
+
+model SystemHealthRecord {
+  id                  String               @id @default(cuid())
+  component           String               // Database, Auth, RecommendationEngine, MapService, NotificationService, LangGraphAgent
+  status              String               // HEALTHY, DEGRADED, DOWN
+  latencyMs           Float?
+  details             String?
+  checkedAt           DateTime             @default(now())
+
+  @@index([component])
+  @@index([checkedAt])
+}
